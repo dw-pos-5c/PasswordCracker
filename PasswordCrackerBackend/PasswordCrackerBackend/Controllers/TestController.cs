@@ -18,10 +18,12 @@ namespace PasswordCrackerBackend.Controllers
         [HttpGet]
         public IActionResult Crack()
         {
+            // abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890
+
             return Ok(passwordService.CrackPassword(
                 "26775436073E00D207E192857EE3730CFCA19DE16F01F0780096EF217C2919EF",
                 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
-                5)
+                6)
                 .Result);
         }
     }
