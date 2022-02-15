@@ -15,7 +15,7 @@ namespace PasswordCrackerBackend.Services
         private int noThreads = Environment.ProcessorCount;
 
         private string result = "* no match *";
-        private bool finished = false;
+        private bool running = true;
 
         public async Task<string> CrackPassword(string hashCode, string possible, int length)
         {
@@ -57,7 +57,7 @@ namespace PasswordCrackerBackend.Services
                     pw[i] = possible[0];
                 }
 
-                while (!finished)
+                while (running)
                 {
                     foreach (byte b in msb)
                     {
@@ -66,7 +66,7 @@ namespace PasswordCrackerBackend.Services
                         if (pwHash.SequenceEqual(hashCode))
                         {
                             result = Encoding.UTF8.GetString(pw);
-                            finished = true;
+                            running = false;
                             return;
                         }
                     }

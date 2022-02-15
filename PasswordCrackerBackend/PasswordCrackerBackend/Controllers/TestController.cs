@@ -19,12 +19,18 @@ namespace PasswordCrackerBackend.Controllers
         public IActionResult Crack()
         {
             // abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890
-
-            return Ok(passwordService.CrackPassword(
-                "26775436073E00D207E192857EE3730CFCA19DE16F01F0780096EF217C2919EF",
-                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
-                6)
-                .Result);
+            var start = DateTime.Now;
+            var password = passwordService.CrackPassword(
+                    "26775436073E00D207E192857EE3730CFCA19DE16F01F0780096EF217C2919EF",
+                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+                    5)
+                .Result;
+            var end = DateTime.Now;
+            return Ok(new
+            {
+                password, 
+                TimeSpan = end.Subtract(start),
+            });
         }
     }
 }
