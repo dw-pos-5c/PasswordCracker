@@ -1,39 +1,59 @@
 ﻿using System.Globalization;
+using System.Net;
 using System.Security.Cryptography;
+using System.Net;
 using System.Text;
-using PasswordCrackerBackend.Controllers;
+using HtmlAgilityPack;
 
 namespace PasswordCrackerBackend.Services
 {
     public class PasswordService
     {
-        private const string pw0 = "A746222F09D85605C52D4E636788D6FFDC274698B98B8C5F3244C06958683A69";
-        private const string pw1 = "3086E346353248775A2C5D74E36A9C9B9BD226A1EE401F830AC499633DC00031";
-        private const string pw2 = "26775436073E00D207E192857EE3730CFCA19DE16F01F0780096EF217C2919EF";
-        private const string pw3 = "43C19A093B34B581DDCC7207F6BD094F6940DB69F035C444425ED84D2CAC037D";
+        // "A746222F09D85605C52D4E636788D6FFDC274698B98B8C5F3244C06958683A69";
+        // "3086E346353248775A2C5D74E36A9C9B9BD226A1EE401F830AC499633DC00031";
+        // "26775436073E00D207E192857EE3730CFCA19DE16F01F0780096EF217C2919EF";
+        // "43C19A093B34B581DDCC7207F6BD094F6940DB69F035C444425ED84D2CAC037D";
 
         private int noThreads = Environment.ProcessorCount;
 
         private string result = "* no match *";
         private bool running = true;
 
+        private byte[] possible;
+        private byte[] hashCode;
+        private int threadLength;
+
+        private int[] valuesCalcedList;
+        private long totalValuesToCalc;
+
         public async Task<string> CrackPassword(string hashCode, string possible, int length)
         {
-            var possibleBytes = Encoding.UTF8.GetBytes(possible);
-            var hashCodeBytes = HexStringToByte(hashCode);
+            this.possible = Encoding.UTF8.GetBytes(possible);
+            this.hashCode = HexStringToByte(hashCode);
+            threadLength = length - 1;
+
+            totalValuesToCalc = (long) Math.Pow(possible.Length, length);
 
             List<Thread> threads = new List<Thread>();
 
             int charsPerThread = possible.Length / noThreads;
 
-            var splitArrays = possibleBytes.Split(charsPerThread, possible.Length % noThreads).ToArray();
+            var lastBytesArray = this.possible.Split(charsPerThread, possible.Length % noThreads).ToArray();
 
-            foreach (var msbArray in splitArrays)
+            valuesCalcedList = new int[lastBytesArray.Length];
+
+            int tempIndex = 0;
+            foreach (var lastBytes in lastBytesArray)
             {
-                var threadStart = new ThreadStart(() => Crack(hashCodeBytes, possibleBytes, length - 1, msbArray));
-                var thread = new Thread(threadStart);
+                int bled = tempIndex;
+                Console.WriteLine(Encoding.UTF8.GetString(lastBytes));
+                var thread = new Thread(() =>
+                {
+                    Crack(lastBytes, out valuesCalcedList[bled]);
+                });
                 threads.Add(thread);
                 thread.Start();
+                tempIndex++;
             }
 
             foreach (var thread in threads)
@@ -44,22 +64,23 @@ namespace PasswordCrackerBackend.Services
             return result;
         }
 
-        private async Task Crack(byte[] hashCode, byte[] possible, int length, byte[] msb)
+        private Task Crack(byte[] lastBytes, out int valuesCalced)
         {
-            var indexes = new int[length];
+            var indexes = new int[threadLength];
+            valuesCalced = 0;
 
             using (var sha256Hash = SHA256.Create())
             {
-                var pw = new byte[length + 1];
+                var pw = new byte[threadLength + 1];
 
-                for (var i = 0; i < length; i++)
+                for (var i = 0; i < threadLength; i++)
                 {
                     pw[i] = possible[0];
                 }
 
                 while (running)
                 {
-                    foreach (byte b in msb)
+                    foreach (byte b in lastBytes)
                     {
                         pw[^1] = b;
                         byte[] pwHash = sha256Hash.ComputeHash(pw);
@@ -67,8 +88,10 @@ namespace PasswordCrackerBackend.Services
                         {
                             result = Encoding.UTF8.GetString(pw);
                             running = false;
-                            return;
+                            return Task.CompletedTask;
                         }
+
+                        valuesCalced++;
                     }
 
                     indexes[0]++;
@@ -77,9 +100,9 @@ namespace PasswordCrackerBackend.Services
                     {
                         if (indexes[i] == possible.Length)
                         {
-                            if (i == length - 1)
+                            if (i == threadLength - 1)
                             {
-                                return;
+                                return Task.CompletedTask;
                             }
                             indexes[i + 1]++;
                             indexes[i] = 0;
@@ -93,7 +116,42 @@ namespace PasswordCrackerBackend.Services
                     }
                 }
             }
+            
+            return Task.CompletedTask;
         }
+
+        public async Task<string> TryPassword(string hashCode)
+        {
+            //*[@id="mw-content-text"]/div[1]/ul[1]/li[1]/a
+
+            var hashCodeBytes = HexStringToByte(hashCode);
+
+            valuesCalcedList = new int[1];
+
+            HtmlWeb web = new HtmlWeb();
+            HtmlDocument doc = web.Load("https://de.wikipedia.org/wiki/Liste_von_Fabelwesen");
+
+            var nodes = doc.DocumentNode.SelectNodes("//*[@id=\"mw-content-text\"]/div/ul/li/a");
+            totalValuesToCalc = nodes.Count;
+            var passwordsToTry = nodes.Select(x => x.InnerText);
+            using (var sha256Hash = SHA256.Create())
+            {
+                foreach (var password in passwordsToTry)
+                {
+                    byte[] pwHash = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(password));
+                    if (pwHash.SequenceEqual(hashCodeBytes))
+                    {
+                        result = password;
+                        return result;
+                    }
+
+                    valuesCalcedList[0]++;
+                }
+            }
+
+            return result;
+        }
+
 
         // Credits to @Michael Wiesinger
         public static byte[] HexStringToByte(string hex)
@@ -106,6 +164,17 @@ namespace PasswordCrackerBackend.Services
             }
 
             return data;
+        }
+
+        public double CalcProgress()
+        {
+            long totalValuesCalced = 0;
+            foreach (var valuesCalced in valuesCalcedList)
+            {
+                totalValuesCalced += valuesCalced;
+            }
+
+            return (double) totalValuesCalced / totalValuesToCalc;
         }
     }
 }

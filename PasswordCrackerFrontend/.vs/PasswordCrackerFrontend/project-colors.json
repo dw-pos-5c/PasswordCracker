@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "ProjectMap": {
+    "b442e108-3dc7-4a74-acf5-24839e739bd6": {
+      "ProjectGuid": "b442e108-3dc7-4a74-acf5-24839e739bd6",
+      "DisplayName": "PasswordCrackerFrontend",
+      "ColorIndex": 0
+    }
+  },
+  "NextColorIndex": 1
+}
